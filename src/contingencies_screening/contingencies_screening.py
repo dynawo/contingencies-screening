@@ -565,6 +565,7 @@ def run_contingencies_screening_thread_loop(
     output_hades_path = output_dir_final_path / settings.HADES_FOLDER
     output_dynawo_path = output_dir_final_path / settings.DYNAWO_FOLDER
 
+    manage_files.dir_exists(output_dir_final_path, input_dir_path / relative_path)
     output_dir_final_path.mkdir(parents=True, exist_ok=True)
 
     hades_input_dir_for_run: Path

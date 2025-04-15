@@ -33,29 +33,6 @@ def dir_exists(output_dir: Path, input_dir: Path) -> None:
             raise SystemExit("User chose not to remove output directory.")
 
 
-def create_output_dir(
-    input_dir_path: Path,
-    output_dir_path: Path,
-    time_dir: Path,
-    replay_dynawo: bool,
-    hades_folder: str,
-    dynawo_folder: str,
-) -> Path:
-    """Creates the necessary output directories."""
-    structure_path = time_dir.relative_to(input_dir_path)
-    hades_output_path = output_dir_path / structure_path / hades_folder
-
-    dir_exists(hades_output_path, input_dir_path)
-    os.makedirs(hades_output_path, exist_ok=True)
-
-    if replay_dynawo:
-        dynawo_output_path = output_dir_path / structure_path / dynawo_folder
-        dir_exists(dynawo_output_path, input_dir_path)
-        os.makedirs(dynawo_output_path, exist_ok=True)
-
-    return output_dir_path / structure_path
-
-
 def clean_data(
     dynawo_output_folder: Path,
     sorted_loadflow_score_list: list,

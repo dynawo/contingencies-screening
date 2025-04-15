@@ -92,7 +92,9 @@ def run_hades(
     else:
         if output_folder != hades_input_file.parent:
             try:
-                os.symlink(str(hades_input_file.parent), str(output_folder))  # Create symlink
+                os.system(
+                    "ln -sf " + str(hades_input_file.parent) + "/* " + str(output_folder) + "/"
+                )  # Create symlink
             except OSError as e:
                 # Handle cases where the link already exists or other errors
                 print(f"Error creating symlink: {e}")

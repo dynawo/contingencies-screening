@@ -2,7 +2,7 @@ import os
 import json
 import pickle
 from pathlib import Path
-from typing import Dict, Any, Tuple, List
+from typing import Dict, Any, Tuple, List, Optional
 
 import pandas as pd
 import typer
@@ -10,8 +10,12 @@ from numpy import mean, std
 from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.linear_model import LinearRegression, TheilSenRegressor
 from sklearn.model_selection import cross_val_score, KFold
+from interpret.glassbox import ExplainableBoostingRegressor
+from skopt import BayesSearchCV
+from skopt.space import Real, Integer
 
 from contingencies_screening.analyze_loadflow import human_analysis
+from contingencies_screening.commons import manage_files
 
 app = typer.Typer(help="Train and evaluate ML models for contingency screening results.")
 
@@ -22,7 +26,18 @@ def convert_dict_to_df(
     tap_changers: bool,
     predicted_score: bool = False,
 ) -> Tuple[pd.DataFrame, Dict[Any, str]]:
-    """Convert and compute result dictionaries to a usable DataFrame."""
+    """
+    Converts and computes result dictionaries into a usable DataFrame.
+
+    Args:
+        contingencies_dict (Dict[Any, Dict[str, Any]]): Dictionary containing contingency data.
+        elements_dict (Dict[str, Any]): Dictionary containing element data.
+        tap_changers (bool): Flag indicating if tap changers are considered.
+        predicted_score (bool, optional): Flag indicating if predicted scores should be included. Defaults to False.
+
+    Returns:
+        Tuple[pd.DataFrame, Dict[Any, str]]: A tuple containing the processed DataFrame and a dictionary of errors.
+    """
     contingencies_df_data: Dict[str, List[Any]] = {
         "NUM": [],
         "NAME": [],
@@ -137,7 +152,16 @@ def convert_dict_to_df(
 
 
 def predict_scores(contingencies_df: pd.DataFrame, model_filename: Path) -> Dict[str, float]:
-    """Predict scores using a pre-loaded ML model."""
+    """
+    Predicts scores using a pre-loaded ML model.
+
+    Args:
+        contingencies_df (pd.DataFrame): DataFrame containing contingency data.
+        model_filename (Path): Path to the pickled ML model file.
+
+    Returns:
+        Dict[str, float]: Dictionary of contingency numbers and their predicted scores.
+    """
     try:
         with open(model_filename, "rb") as f:
             model = pickle.load(f)
@@ -170,7 +194,18 @@ def analyze_loadflow_results(
     tap_changers: bool,
     model_path: Path = None,
 ) -> Dict[Any, Dict[str, Any]]:
-    """Predicts the difference score using an ML model."""
+    """
+    Predicts the difference score using an ML model.
+
+    Args:
+        contingencies_dict (Dict[Any, Dict[str, Any]]): Dictionary containing contingency data.
+        elements_dict (Dict[str, Any]): Dictionary containing element data.
+        tap_changers (bool): Flag indicating if tap changers were considered in the load flow analysis.
+        model_path (Path, optional): Path to the ML model file. Defaults to None.
+
+    Returns:
+        Dict[Any, Dict[str, Any]]: Updated contingency dictionary with predicted scores.
+    """
     print("Converting Hades results to DataFrame for ML prediction...")
     contingencies_df, error_contg = convert_dict_to_df(
         contingencies_dict, elements_dict, tap_changers
@@ -222,7 +257,17 @@ def analyze_loadflow_results(
 
 
 def normalize_LR(X: pd.DataFrame, coefs: List[float]) -> List[float]:
-    """Normalize Linear Regression coefficients by feature mean."""
+    """
+    Normalizes Linear Regression coefficients by the mean of their respective features.
+
+    Args:
+        X (pd.DataFrame): DataFrame of features.
+        coefs (List[float]): List of Linear Regression coefficients.
+
+    Returns:
+        List[float]: List of normalized coefficients. Returns an empty list if there's a mismatch
+                     in the number of columns and coefficients or if a feature mean cannot be calculated.
+    """
     coefs_norm = []
     cols = list(X.columns)
 
@@ -246,12 +291,21 @@ def normalize_LR(X: pd.DataFrame, coefs: List[float]) -> List[float]:
 
 
 def load_df(path: Path) -> pd.DataFrame:
-    """Loads and concatenates contingency DataFrames from a nested directory structure."""
+    """
+    Loads and concatenates contingency DataFrames from CSV files within a nested directory structure.
+
+    Args:
+        path (Path): Path to the base folder containing the training data.
+
+    Returns:
+        pd.DataFrame: A concatenated DataFrame containing all loaded contingency data.
+                      Returns an empty DataFrame if no valid files are found or loaded.
+    """
     all_dfs: List[pd.DataFrame] = []
     file_count = 0
 
     print(f"Loading data from base path: {path}")
-    target_filename = "contg_df.csv"
+    target_filename = "*contg_df.csv"
     csv_files = list(path.rglob(f"**/{target_filename}"))
 
     if not csv_files:
@@ -293,6 +347,92 @@ def load_df(path: Path) -> pd.DataFrame:
     return df_contg
 
 
+def tune_model(
+    model,
+    parameters: Dict[str, Any],
+    X: pd.DataFrame,
+    y: pd.Series,
+    cv_splits: int = 5,
+    n_iterations: int = 50,
+    n_jobs: int = -1,
+    random_state: int = 0,
+    output_dir: Path = None,
+    model_name: str = "BayesSearchCV_results",
+):
+    """
+    Tunes a given model using BayesSearchCV and saves the results.
+
+    Args:
+        model: The scikit-learn estimator to tune.
+        parameters (Dict[str, Any]): The parameter search space.
+        X (pd.DataFrame): The feature matrix.
+        y (pd.Series): The target vector.
+        cv_splits (int, optional): Number of cross-validation folds. Defaults to 5.
+        n_iterations (int, optional): Number of optimization iterations. Defaults to 50.
+        n_jobs (int, optional): Number of jobs to run in parallel (-1 means all processors). Defaults to 8.
+        random_state (int, optional): Random state for reproducibility. Defaults to 0.
+        output_dir (Path, optional): Directory to save the results CSV. Defaults to None.
+        model_name (str, optional): Base name for the output CSV file. Defaults to "BayesSearchCV_results".
+    """
+    print(f"\n--- Tuning {type(model).__name__} using BayesSearchCV ---")
+    clf = BayesSearchCV(
+        estimator=model,
+        search_spaces=parameters,
+        scoring="neg_mean_absolute_error",
+        cv=cv_splits,
+        verbose=5,
+        n_jobs=n_jobs,
+        random_state=random_state,
+        n_iter=n_iterations,
+    )
+    clf.fit(X, y)
+
+    print("\nBayesSearchCV Best Parameters:")
+    print(clf.best_params_)
+
+    print("\nBayesSearchCV Cross-Validation Results:")
+    print(clf.cv_results_)
+
+    if output_dir:
+        results_df = pd.DataFrame.from_dict(clf.cv_results_, orient="columns")
+        output_csv_path = output_dir / f"{model_name}_{type(model).__name__}.csv"
+        try:
+            results_df.to_csv(output_csv_path, index=False)
+            print(f"\nBayesSearchCV results saved to: {output_csv_path}")
+        except OSError as e:
+            print(f"Error saving BayesSearchCV results to CSV: {e}")
+
+    return clf.best_params_
+
+
+def load_tuned_parameters(file_path: Path) -> Optional[Dict[str, Dict[str, Any]]]:
+    """
+    Loads tuned parameters from a JSON file.
+
+    Args:
+        file_path (Path): Path to the JSON file containing tuned parameters.
+
+    Returns:
+        Optional[Dict[str, Dict[str, Any]]]: A dictionary where keys are model names
+                                             and values are dictionaries of their best parameters.
+                                             Returns None if the file is not found or loading fails.
+    """
+    try:
+        with open(file_path, "r") as f:
+            tuned_params = json.load(f)
+        print(f"Loaded tuned parameters from: {file_path}")
+        return tuned_params
+    except FileNotFoundError:
+        print(f"Warning: Tuned parameters file not found at: {file_path}")
+        return None
+    except json.JSONDecodeError:
+        print(f"Warning: Error decoding JSON from: {file_path}")
+        return None
+    except Exception as e:
+        print(f"Warning: An error occurred while loading tuned parameters: {e}")
+        return None
+
+
 @app.command()
 def main(
     output_path: Path = typer.Argument(
@@ -310,6 +450,12 @@ def main(
         writable=True,
         resolve_path=True,
     ),
+    tune: bool = typer.Option(
+        False, "--tune", help="Enable hyperparameter tuning using BayesSearchCV."
+    ),
+    tuned_params_path: Optional[Path] = typer.Option(
+        None, "--tuned-params", help="Path to a JSON file containing tuned hyperparameters."
+    ),
 ):
     """Trains and evaluates ML models on contingency screening data."""
     pd.options.mode.chained_assignment = None
@@ -319,6 +465,7 @@ def main(
     print(f"Saving models to: {model_path}")
 
     try:
+        manage_files.dir_exists(model_path, output_path)
         model_path.mkdir(parents=True, exist_ok=True)
     except OSError as e:
         print(f"Error: Could not create model output directory {model_path}: {e}")
@@ -364,12 +511,71 @@ def main(
     print(f"Target (y) shape: {y.shape}")
     print(f"Features columns: {list(X.columns)}")
 
+    tuned_parameters = None
+    if tuned_params_path:
+        tuned_parameters = load_tuned_parameters(tuned_params_path)
+
     print("Defining models...")
-    model_GBR = GradientBoostingRegressor(
-        learning_rate=0.05, n_estimators=300, max_depth=5, random_state=42
-    )
-    model_LR_Mean = LinearRegression()
-    model_LR_Median = TheilSenRegressor(random_state=42)
+
+    gbr_params = {
+        "learning_rate": Real(0.01, 0.3, prior="log-uniform"),
+        "n_estimators": Integer(100, 500),
+        "max_depth": Integer(3, 10),
+        "min_samples_split": Integer(2, 10),
+        "min_samples_leaf": Integer(1, 5),
+        "subsample": Real(0.7, 1.0),
+    }
+    model_GBR = GradientBoostingRegressor(random_state=42)
+
+    ebm_params = {
+        "learning_rate": Real(00.001, 0.1, prior="log-uniform"),
+        "max_bins": Integer(8, 64),
+        "interactions": Integer(0, 5),
+        "outer_bags": Integer(8, 16),
+        "smoothing_rounds": Integer(100, 500),
+    }
+    model_EBM = ExplainableBoostingRegressor(random_state=42)
+
+    if tune:
+        best_gbr_params = tune_model(
+            GradientBoostingRegressor(random_state=42),
+            gbr_params,
+            X,
+            y,
+            output_dir=model_path,
+            model_name="GBR",
+        )
+        best_ebm_params = tune_model(
+            ExplainableBoostingRegressor(random_state=42),
+            ebm_params,
+            X,
+            y,
+            output_dir=model_path,
+            model_name="EBM",
+        )
+        tuned_parameters_to_save = {
+            "GradientBoostingRegressor": best_gbr_params,
+            "ExplainableBoostingRegressor": best_ebm_params,
+        }
+        tuned_params_output_path = model_path / "tuned_hyperparameters.json"
+        try:
+            with open(tuned_params_output_path, "w") as f:
+                json.dump(tuned_parameters_to_save, f, indent=4)
+            print(f"\nTuned hyperparameters saved to: {tuned_params_output_path}")
+        except OSError as e:
+            print(f"Error saving tuned hyperparameters: {e}")
+    elif tuned_parameters:
+        print("\nUsing loaded tuned hyperparameters...")
+        if "GradientBoostingRegressor" in tuned_parameters:
+            model_GBR = GradientBoostingRegressor(
+                **tuned_parameters["GradientBoostingRegressor"], random_state=42
+            )
+            print(f"GBR parameters: {tuned_parameters['GradientBoostingRegressor']}")
+        if "ExplainableBoostingRegressor" in tuned_parameters:
+            model_EBM = ExplainableBoostingRegressor(
+                **tuned_parameters["ExplainableBoostingRegressor"], random_state=42
+            )
+            print(f"EBM parameters: {tuned_parameters['ExplainableBoostingRegressor']}")
 
     print("Performing 5-fold cross-validation...")
     cv = KFold(n_splits=5, shuffle=True, random_state=42)
@@ -390,7 +596,24 @@ def main(
     except Exception as e:
         print(f"Error during GBR cross-validation: {e}")
 
+    print("Evaluating Explainable Boosting Machine...")
+    try:
+        n_scores_EBM = cross_val_score(
+            model_EBM,
+            X,
+            y,
+            scoring="neg_mean_absolute_error",
+            cv=cv,
+            n_jobs=-1,
+            error_score="raise",
+            verbose=1,
+        )
+        print("MAE EBM: %.3f (+/- %.3f)" % (mean(-n_scores_EBM), std(-n_scores_EBM)))
+    except Exception as e:
+        print(f"Error during EBM cross-validation: {e}")
+
     print("Evaluating Linear Regression (Mean)...")
+    model_LR_Mean = LinearRegression()
     try:
         n_scores_LR_Mean = cross_val_score(
             model_LR_Mean,
@@ -407,6 +630,7 @@ def main(
         print(f"Error during LR Mean cross-validation: {e}")
 
     print("Evaluating Theil-Sen Regressor (Median)...")
+    model_LR_Median = TheilSenRegressor(random_state=42)
     try:
         n_scores_LR_Median = cross_val_score(
             model_LR_Median,
@@ -434,6 +658,15 @@ def main(
         print(f"GBR model saved to: {gbr_model_file}")
     except Exception as e:
         print(f"Error training or saving GBR model: {e}")
+
+    try:
+        model_EBM.fit(X, y)
+        ebm_model_file = model_path / "EBM_model.pkl"
+        with open(ebm_model_file, "wb") as f:
+            pickle.dump(model_EBM, f)
+        print(f"EBM model saved to: {ebm_model_file}")
+    except Exception as e:
+        print(f"Error training or saving EBM model: {e}")
 
     try:
         model_LR_Mean.fit(X, y)
