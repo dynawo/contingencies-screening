@@ -8,21 +8,21 @@ def calc_diff_volt(
     contingency_values: List[List[Union[int, float]]],
     loadflow_values: Dict[int, Dict[str, float]],
 ) -> float:
-    """Calcula la diferencia total de voltaje entre los valores de contingencia y los valores de flujo de carga."""
+    """Calculates the total voltage difference between contingency values and load flow values."""
     return sum(
         abs(poste_v[1] - loadflow_values[poste_v[0]]["volt"]) for poste_v in contingency_values
     ) + len(contingency_values)
 
 
 def calc_diff_max_flow(list_values: List[List[float]]) -> float:
-    """Calcula la diferencia total de flujo máximo."""
+    """Calculates the total maximum flow difference."""
     return sum(abs(max_flow[1] / 10) for max_flow in list_values) + len(list_values)
 
 
 def calc_constr_gen_Q(
     contingency_values: List[Dict[str, Any]], elem_dict: Dict[int, Dict[str, Any]]
 ) -> float:
-    """Calcula la puntuación de restricción para la generación Q."""
+    """Calculates the constraint score for reactive power generation (Q)."""
     return sum(
         abs(float(constr["after"]) - float(constr["before"]))
         * (1 + elem_dict[constr["elem_num"]]["volt_level"] / 10)
@@ -33,7 +33,7 @@ def calc_constr_gen_Q(
 def calc_constr_gen_U(
     contingency_values: List[Dict[str, Any]], elem_dict: Dict[int, Dict[str, Any]]
 ) -> float:
-    """Calcula la puntuación de restricción para la generación U."""
+    """Calculates the constraint score for active power generation (U)."""
     return sum(
         abs(float(constr["after"]) - float(constr["before"]))
         * (1 + elem_dict[constr["elem_num"]]["volt_level"] / 10)
@@ -44,7 +44,7 @@ def calc_constr_gen_U(
 def calc_constr_volt(
     contingency_values: List[Dict[str, Any]], elem_dict: Dict[int, Dict[str, Any]]
 ) -> float:
-    """Calcula el valor de la restricción de voltaje."""
+    """Calculates the value of the voltage constraint."""
     final_value = 0
     for volt_constr in contingency_values:
         tempo = int(volt_constr["tempo"])
@@ -56,7 +56,7 @@ def calc_constr_volt(
 def calc_constr_flow(
     contingency_values: List[Dict[str, Any]], elem_dict: Dict[int, Dict[str, Any]]
 ) -> float:
-    """Calcula el valor de la restricción de flujo."""
+    """Calculates the value of the flow constraint."""
     final_value = 0
     for flow_constr in contingency_values:
         tempo = int(flow_constr["tempo"])
@@ -74,7 +74,7 @@ def analyze_loadflow_results_continuous(
     tap_changers: bool,
     model_path: Optional[Path] = None,
 ) -> Dict[str, Dict[str, Any]]:
-    """Predice la diferencia entre la resolución de flujo de carga de Hades y Dynawo."""
+    """Predicts the difference between Hades and Dynawo load flow calculation results."""
 
     print(
         "\nWARNING: Remember that if you have selected the human analysis option, you must provide the path of a LR in JSON format that matches (has been trained) the option selected on the taps (activated or not activated).\n"

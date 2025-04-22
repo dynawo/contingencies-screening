@@ -990,7 +990,3 @@ def main(
     print(f"Processed {processed_count} time directories.")
     print(f"Output generated in: {output_dir_path}")
 
-
-# --- Entry point ---
-if __name__ == "__main__":
-    app()
