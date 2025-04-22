@@ -3,6 +3,10 @@ import shutil
 from typing import Tuple, Optional
 from lxml import etree as ET
 
+import typer
+
+app = typer.Typer(help="Train and evaluate ML models for contingency screening results.")
+
 
 def check_basecase_dir(input_dir: Path) -> bool:
     """
@@ -175,7 +179,7 @@ def extract_date_time(filename: str) -> Tuple[str, str, str, str, str]:
     date_str = parts[1]
     time_str = parts[2].split(".")[0]
 
-    if len(date_str) != 8 or len(time_str) != 6:
+    if len(date_str) != 8 or len(time_str) != 4:
         raise ValueError(f"Date or time string in filename '{filename}' has incorrect length.")
 
     return (
@@ -259,27 +263,93 @@ def merge_xml_files(file1: Path, file2: Path, output_dir: Path) -> None:
         print(f"An unexpected error occurred: {e}")
 
 
-if __name__ == "__main__":
+@app.command()
+def main(
+    hades_contingencies_path: Path = typer.Argument(
+        ...,
+        help="Path to Hades contingencies XML.",
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        readable=True,
+        resolve_path=True,
+    ),
+    hades_snapshots_path: Path = typer.Argument(
+        ...,
+        help="Path to Hades snapshot XMLs folder.",
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
+        readable=True,
+        resolve_path=True,
+    ),
+    dynawo_contingencies_path: Path = typer.Argument(
+        ...,
+        help="Path to Dynawo contingencies JSON.",
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        readable=True,
+        resolve_path=True,
+    ),
+    dynawo_snapshots_path: Path = typer.Argument(
+        ...,
+        help="Path to Dynawo snapshot XMLs folder.",
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
+        readable=True,
+        resolve_path=True,
+    ),
+    dynawo_config_path: Path = typer.Argument(
+        ...,
+        help="Path to Dynawo config JSON.",
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        readable=True,
+        resolve_path=True,
+    ),
+    dynawo_assembling_path: Path = typer.Argument(
+        ...,
+        help="Path to Dynawo assembling XML.",
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        readable=True,
+        resolve_path=True,
+    ),
+    dynawo_setting_path: Path = typer.Argument(
+        ...,
+        help="Path to Dynawo setting XML.",
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        readable=True,
+        resolve_path=True,
+    ),
+    output_path: Path = typer.Argument(
+        ...,
+        help="Path to output directory.",
+        exists=False,
+        file_okay=False,
+        dir_okay=True,
+        writable=True,
+        resolve_path=True,
+    ),
+):
+    """Creates basecases by processing Hades and Dynawo snapshots."""
     try:
-        base_dir = Path("/home/guiu/Projects/CONT_SCR_CRV_REC/Data")
         create_basecases_from_RTE(
-            base_dir / "Hades" / "contingencies.xml",
-            base_dir / "Hades" / "adn",
-            base_dir / "Dynawo" / "contingencies.json",
-            base_dir / "Dynawo" / "iidm",
-            base_dir / "Dynawo" / "DFLConfig.json",
-            base_dir
-            / "Dynawo"
-            / "interfaceDynamo_v1.7.0_powsybl"
-            / "share"
-            / "assembling_dynaflow_StanWay.xml",
-            base_dir
-            / "Dynawo"
-            / "interfaceDynamo_v1.7.0_powsybl"
-            / "share"
-            / "setting_dynaflow_StanWay.xml",
-            base_dir / "New_Data_DCS_Prepared",
+            hades_contingencies_path,
+            hades_snapshots_path,
+            dynawo_contingencies_path,
+            dynawo_snapshots_path,
+            dynawo_config_path,
+            dynawo_assembling_path,
+            dynawo_setting_path,
+            output_path,
         )
-        check_basecase_dir(base_dir / "New_Data_DCS_Prepared")
+        check_basecase_dir(output_path / "data")
     except Exception as e:
         print(f"An error occurred during main execution: {e}")

@@ -2,6 +2,14 @@ from lxml import etree
 import os
 import shutil
 from pathlib import Path
+import tarfile
+import glob
+import typer
+from typing_extensions import Annotated
+
+app = typer.Typer(
+    help="If the outputs are compressed using the -z option of the run_contingencies_screening command line, extract the necessary data to train a model."
+)
 
 
 def parse_xml_file(xml_file: str) -> etree._ElementTree:
@@ -93,3 +101,66 @@ def compress_results(path: Path) -> None:
         )
     except OSError as e:
         print(f"Error compressing results at {path}: {e}")
+
+
+@app.command()
+def main(
+    base_dir: Annotated[
+        str, typer.Argument(help="Base directory where to search for .tar.gz files")
+    ],
+):
+    """
+    Searches for .tar.gz files in the base directory and its subdirectories,
+    extracts and renames the contg_df.csv file within them.
+    """
+    print("Starting the search and extraction process...")
+
+    # Search for all .tar.gz files in the subdirectories of 'base_dir'
+    for tar_file in glob.iglob(os.path.join(base_dir, "**", "*.tar.gz"), recursive=True):
+        # Show the file being processed
+        print(f"Processing: {tar_file}")
+
+        # Path to the directory where the CSV file will be extracted
+        destination_dir = os.path.dirname(tar_file)
+
+        # Name of the tar file without the .tar.gz extension
+        tar_file_name = str(os.path.basename(tar_file)).split(".")[0]
+
+        # Name of the expected CSV file within the tar
+        csv_file_in_tar = os.path.join(tar_file_name, "contg_df.csv")
+
+        # Destination name for the CSV file
+        destination_csv_file = os.path.join(destination_dir, f"{tar_file_name}_contg_df.csv")
+
+        # Check if the file already exists
+        if os.path.exists(destination_csv_file):
+            print(
+                f"    The file {os.path.basename(destination_csv_file)} already exists. Skipping extraction."
+            )
+            continue
+
+        # Attempt to extract the contg_df.csv file and rename it
+        print(f"    Extracting and renaming contg_df.csv in {destination_dir}...")
+        try:
+            with tarfile.open(tar_file, "r:gz") as tar:
+                try:
+                    tar.extract(csv_file_in_tar, path=destination_dir)
+                    extracted_file_path = os.path.join(destination_dir, csv_file_in_tar)
+                    if os.path.exists(extracted_file_path):
+                        os.rename(extracted_file_path, destination_csv_file)
+                        os.rmdir(os.path.join(destination_dir, tar_file_name))
+                        print(
+                            f"        Success! The contg_df.csv file was successfully renamed to {os.path.basename(destination_csv_file)} in {destination_dir}"
+                        )
+                    else:
+                        print(
+                            f"        Error! The file {os.path.basename(csv_file_in_tar)} was not found inside {tar_file}"
+                        )
+                except KeyError:
+                    print(
+                        f"        Error! The file {os.path.basename(csv_file_in_tar)} was not found inside {tar_file}"
+                    )
+        except tarfile.ReadError:
+            print(f"        Error! Could not open or read the file {tar_file}")
+
+    print("Search and extraction process completed.")

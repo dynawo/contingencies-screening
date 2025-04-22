@@ -31,4 +31,6 @@ line-length = 99
 [project.scripts]
 run_contingencies_screening = "contingencies_screening.contingencies_screening:app"
 train_test_loadflow_results = "contingencies_screening.analyze_loadflow.machine_learning_analysis:app"
+prepare_basecase = "contingencies_screening.prepare_basecase.prepare_basecase:app"
+extract_contingencies_csv = "contingencies_screening.commons.manage_files:app"
 
