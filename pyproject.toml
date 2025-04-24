@@ -18,6 +18,7 @@ dependencies = [
     "scikit-optimize>=0.10.2",
     "seaborn>=0.13.2",
     "shap>=0.47.1",
+    "tqdm>=4.67.1",
     "typer>=0.15.2",
 ]
 
