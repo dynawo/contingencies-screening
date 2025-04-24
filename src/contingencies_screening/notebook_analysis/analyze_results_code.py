@@ -245,11 +245,15 @@ def hour_boxplot(df_contg: pd.DataFrame, str_score: str) -> None:
     try:
         start_date = datetime(2024, 12, 21, 0, 0, 0)
         end_date = datetime(2024, 12, 21, 23, 59, 59)
-        df_filtered = df_contg[
-            (df_contg["DATE"] >= start_date)
-            & (df_contg["DATE"] <= end_date)
-            & (df_contg["STATUS"] == "BOTH")
-        ].copy().sort_values(by="DATE")
+        df_filtered = (
+            df_contg[
+                (df_contg["DATE"] >= start_date)
+                & (df_contg["DATE"] <= end_date)
+                & (df_contg["STATUS"] == "BOTH")
+            ]
+            .copy()
+            .sort_values(by="DATE")
+        )
 
         if not df_filtered.empty:
             plt.figure(figsize=(12, 6))
@@ -288,11 +292,15 @@ def day_boxplot(df_contg: pd.DataFrame, str_score: str) -> None:
     try:
         start_date = datetime(2024, 12, 1, 0, 0, 0)
         end_date = datetime(2024, 12, 31, 23, 59, 59)
-        df_filtered = df_contg[
-            (df_contg["DATE"] >= start_date)
-            & (df_contg["DATE"] <= end_date)
-            & (df_contg["STATUS"] == "BOTH")
-        ].copy()
+        df_filtered = (
+            df_contg[
+                (df_contg["DATE"] >= start_date)
+                & (df_contg["DATE"] <= end_date)
+                & (df_contg["STATUS"] == "BOTH")
+            ]
+            .copy()
+            .sort_values(by="DATE")
+        )
         df_filtered.loc[:, "DATE_ONLY"] = df_filtered["DATE"].dt.date
 
         if not df_filtered.empty:
@@ -371,7 +379,15 @@ def real_vs_predicted_score(df_filtered, mae):
     plt.title("Predicted Score vs. Real Score (STATUS = BOTH)")
     plt.grid(True)
     plt.axline((0, 0), slope=1, color="red", linestyle="--")
-    plt.text(0.05, 0.95, f"MAE = {mae:.2f}", transform=plt.gca().transAxes, fontsize=10, verticalalignment='top', horizontalalignment='left')
+    plt.text(
+        0.05,
+        0.95,
+        f"MAE = {mae:.2f}",
+        transform=plt.gca().transAxes,
+        fontsize=10,
+        verticalalignment="top",
+        horizontalalignment="left",
+    )
     plt.tight_layout()
     plt.show()
 
@@ -386,7 +402,34 @@ def plot_correlation_matrix(df):
     correlation_matrix = df.corr(numeric_only=True)  # Calculate the correlation matrix
 
     plt.figure(figsize=(10, 8))
-    sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm', fmt=".2f", linewidths=.5)
-    plt.title('Correlation Matrix')
+    sns.heatmap(correlation_matrix, annot=True, cmap="coolwarm", fmt=".2f", linewidths=0.5)
+    plt.title("Correlation Matrix")
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_residual_distribution(df_real_predicted):
+    """
+    Generates and displays a distribution plot (histogram and KDE) of the residuals
+    between the 'REAL_SCORE' and 'PREDICTED_SCORE' columns in the input DataFrame.
+
+    Args:
+        df_real_predicted (pd.DataFrame): DataFrame containing 'REAL_SCORE' and 'PREDICTED_SCORE' columns.
+    """
+    if (
+        "REAL_SCORE" not in df_real_predicted.columns
+        or "PREDICTED_SCORE" not in df_real_predicted.columns
+    ):
+        print("Error: DataFrame must contain 'REAL_SCORE' and 'PREDICTED_SCORE' columns.")
+        return
+
+    residuals = df_real_predicted["REAL_SCORE"] - df_real_predicted["PREDICTED_SCORE"]
+
+    plt.figure(figsize=(10, 6))
+    sns.histplot(residuals, kde=True)
+    plt.title("Distribution of Residuals (Real Score - Predicted Score)")
+    plt.xlabel("Residual Value")
+    plt.ylabel("Frequency")
+    plt.grid(True, alpha=0.5)
     plt.tight_layout()
     plt.show()
