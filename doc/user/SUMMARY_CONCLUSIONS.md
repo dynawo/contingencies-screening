@@ -163,7 +163,7 @@ Okay, here is the completed section, summarized to approximately 20%, maintainin
 
 Markdown
 
-### Global Importance of Features (EBM) for Predicting Discrepancy (based on the image `Screenshot from 2025-05-30 13-00-19.png-5ab02012-68d8-49cc-8ef0-da2b3b594e36` and the provided list)
+### Global Importance of Features (EBM) for Predicting Discrepancy
 
 The global explanation of the EBM model reveals the influence of individual features and interactions on the `REAL_SCORE` prediction. The most influential ones according to the provided list and graph visualization are described below:
 
