@@ -63,18 +63,25 @@ Analyzing these contingencies helps to understand the subtleties and specific re
 
 ## ANALYSIS OF DISCREPANCY PREDICTION MODELS
 
-Two ML models, EBM and GBR, and a simple model, LR, were evaluated to predict the `REAL_SCORE` on a test set (277 snapshots, ~216k contingencies), as detailed in `analyze_results_RTE_EBM` and `analyze_results_RTE_GBR`. The key metric, Mean Absolute Error (MAE), measures the average deviation between the predicted and observed `REAL_SCORE`.
+Two machine learning (ML) models, **Explainable Boosting Machine (EBM)** and **Gradient Boosting Regressor (GBR)**, along with a simpler **Linear Regression (LR)** model, were evaluated to predict the `REAL_SCORE`. This evaluation was performed on a test set comprising 277 snapshots, which amounts to approximately 216,000 contingencies. The analysis details can be found in `analyze_results_RTE_EBM` and `analyze_results_RTE_GBR`.
 
-* **Explainable Boosting Machine (EBM)**:
-    * MAE (Real score vs Predicted score): 365.93
+Key performance metrics include the **Mean Absolute Error (MAE)**, which measures the average absolute deviation between the predicted and observed `REAL_SCORE`, and the **Root Mean Squared Error (RMSE)**, which provides another measure of prediction error.
+
+---
 * **Gradient Boosting Regressor (GBR)**:
-    * MAE (Real score vs Predicted score): 343.76
-* **Linear Regression (Human Model)**:
-    * MAE (Real score vs Predicted score): 390.27
+    * Root Mean Squared Error (RMSE): 480.85
+    * Mean Absolute Error (MAE): 266.67
+* **Explainable Boosting Machine (EBM)**:
+    * Root Mean Squared Error (RMSE): 496.99
+    * Mean Absolute Error (MAE): 273.58
+* **Linear Regression (LR - Human Model)**:
+    * Root Mean Squared Error (RMSE): 593.59
+    * Mean Absolute Error (MAE): 390.27
+---
 
-Machine Learning models (GBR and EBM) achieve an MAE in the approximate range of 340-370. Considering that the `REAL_SCORE` can vary significantly, this level of error indicates a useful capability of these models to help distinguish between contingencies with low, medium, and high probability of divergence between Hades and Dynawo simulations. This prediction is valuable for prioritizing the use of dynamic simulations with Dynawo in those cases where they are expected to provide more informational value, i.e., where a high `REAL_SCORE` is anticipated and, therefore, a greater insufficiency of static analysis.
+Machine Learning models (GBR and EBM) achieve an MAE in the approximate range of **260-280**. Considering that the `REAL_SCORE` can vary significantly, this level of error indicates a useful capability of these models to help distinguish between contingencies with low, medium, and high probability of divergence between Hades and Dynawo simulations. This prediction is valuable for prioritizing the use of dynamic simulations with Dynawo in those cases where they are expected to provide more informational value, i.e., where a high `REAL_SCORE` is anticipated and, therefore, a greater insufficiency of static analysis.
 
-When comparing the predictive performance of the three approaches, the GBR model stands out as the most accurate, closely followed by the EBM. The Linear Regression model, while offering direct interpretability through its coefficients, presents a higher MAE, reflecting a lesser ability to capture the complexity of the relationships that determine the `REAL_SCORE` compared to boosting models.
+When comparing the predictive performance of the three approaches, the **GBR model stands out as the most accurate**, closely followed by the EBM. The Linear Regression model, while offering direct interpretability through its coefficients, presents a higher MAE and RMSE, reflecting a lesser ability to capture the complexity of the relationships that determine the `REAL_SCORE` compared to boosting models.
 
 Focusing on the two best-performing Machine Learning models, although GBR is slightly more accurate than EBM, the difference in their MAEs is relatively small. In this context, the choice of the preferred model should consider other factors besides pure accuracy. **Although the EBM model has a subtly higher MAE than GBR, its main advantage lies in its inherent interpretability.** The EBM is designed to be a "white-box" or "glass-box" model, where the contribution of each feature to the prediction is directly visible and understandable without the need for complex post-hoc techniques (such as those GBR would require for a similar explanation, for example, using SHAP). This ability to offer reasoned explanations behind its predictions is fundamental in critical applications such as power system security analysis, where understanding the "why" of a prediction is as important as the prediction itself. **For this reason, and in line with the project's emphasis on interpretability and the need for models understandable by power system engineers, EBM is the recommended model,** as it offers an excellent balance between robust predictive capability and total transparency.
 
